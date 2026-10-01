@@ -1,0 +1,14 @@
+hacer un codigo en python:
+
+extraer los simbolos de las criptomonedas de https://coinmarketcap.com/watchlist/665296ac3a9fc91e643242c9/
+y colocarlas respetando el formato en activos1.js
+
+extraer los simbolos de las criptomonedas de https://coinmarketcap.com/watchlist/6a9f0fd1c70da40254917d7d/
+y colocarlas respetando el formato en activos2.js
+
+reglas especiales para las 2 extracciones de datos:
+AI Artificial Inu, blockchain robin hood, asignar contrato
+LIT asignar nombre Lighter
+RAY asignar nombre Raydium
+UNI asignar nombre Uniswap
+

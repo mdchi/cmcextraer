@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="1800">
+    <title>Watchlist Dinámica - Texto Plano</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            white-space: pre-wrap;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            padding: 0 30px 30px;
+            font-size: 12px;
+            line-height: 1.6;
+            margin: 0;
+            overflow-x: auto;
+        }
+        .pos { color: #00ff88; font-weight: bold; }
+        .neg { color: #ff4444; font-weight: bold; }
+        #monitor {
+            background: #111;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: inline-block;
+            min-width: fit-content;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="monitor">Cargando datos de la Watchlist...</div>
+
+    <script src="activos1.js"></script>
+    <script>
+        // Mapeo de símbolos conocidos a sus IDs de CoinGecko
+        const SYMBOL_TO_COIN = {
+            'BTC': { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+            'ETH': { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+            'USDT': { id: 'tether', symbol: 'USDT', name: 'Tether' },
+            'BNB': { id: 'binancecoin', symbol: 'BNB', name: 'BNB' },
+            'XRP': { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+            'SOL': { id: 'solana', symbol: 'SOL', name: 'Solana' },
+            'HYPE': { id: 'hyperliquid', symbol: 'HYPE', name: 'Hyperliquid' },
+            'ZEC': { id: 'zcash', symbol: 'ZEC', name: 'Zcash' },
+            'XMR': { id: 'monero', symbol: 'XMR', name: 'Monero' },
+            'SUI': { id: 'sui', symbol: 'SUI', name: 'Sui' },
+            'AVAX': { id: 'avalanche-2', symbol: 'AVAX', name: 'Avalanche' },
+            'TAO': { id: 'bittensor', symbol: 'TAO', name: 'Bittensor' },
+            'ONDO': { id: 'ondo-finance', symbol: 'ONDO', name: 'Ondo' },
+            'MNT': { id: 'mantle', symbol: 'MNT', name: 'Mantle' },
+            'AAVE': { id: 'aave', symbol: 'AAVE', name: 'Aave' },
+            'RENDER': { id: 'render-token', symbol: 'RENDER', name: 'Render' },
+            'KAS': { id: 'kaspa', symbol: 'KAS', name: 'Kaspa' },
+            'ARB': { id: 'arbitrum', symbol: 'ARB', name: 'Arbitrum' },
+            'NEXO': { id: 'nexo', symbol: 'NEXO', name: 'Nexo' },
+            'PUMP': { id: 'pump-fun', symbol: 'PUMP', name: 'Pump.fun' },
+            'AERO': { id: 'aerodrome-finance', symbol: 'AERO', name: 'Aerodrome Finance' },
+            'XPL': { id: 'plasma', symbol: 'XPL', name: 'Plasma' },
+            'AR': { id: 'arweave', symbol: 'AR', name: 'Arweave' },
+            'XPIN': { id: 'xpin-network', symbol: 'XPIN', name: 'XPIN Network' },
+            'RON': { id: 'ronin', symbol: 'RON', name: 'Ronin' },
+            'LINEA': { id: 'linea', symbol: 'LINEA', name: 'Linea' },
+            'MMT': { id: 'momentum-3', symbol: 'MMT', name: 'Momentum' },
+            'THE': { id: 'thena', symbol: 'THE', name: 'THENA' },
+            'FOXY': { id: 'foxy', symbol: 'FOXY', name: 'Foxy' },
+            'ASTER': { id: 'aster-2', symbol: 'ASTER', name: 'Aster' },
+            'STONK': { id: 'stonk-3', symbol: 'STONK', name: 'STONK' },
+            'STORK': { id: 'stonk-3', symbol: 'STONK', name: 'STONK' },
+            'LIGHTER': { id: 'lighter', symbol: 'LIT', name: 'Lighter' }
+        };
+
+        const COINGECKO_API_KEY = 'CG-jSiiTYtuqXqQkCMgSkJj2hwy';
+
+        // Mapeo opcional de contratos a sus datos (id de CoinGecko o plataforma/red):
+        const CONTRACTS_MAP = {
+            '0x2e8c31162b855a2ffa90f6f8634643ad6f111e18': {
+                id: 'artificial-inu-3',
+                symbol: 'AI',
+                name: 'Artificial Inu',
+                platform: 'robinhood'
+            },
+            '6gmafsys4gk3fdao5fzzysqppzawsa4rujhacpmpungx': {
+                id: 'stonk-3',
+                symbol: 'STONK',
+                name: 'STONK',
+                platform: 'solana'
+            },
+            '6GmAFSYs4gk3FDao5FzzySQpPZaWsa4rUJHacpMpUNgx': {
+                id: 'stonk-3',
+                symbol: 'STONK',
+                name: 'STONK',
+                platform: 'solana'
+            }
+        };
+
+        // Función para acortar números grandes (ej: 1.5T, 20B)
+        function formatLargeNum(num) {
+            if (num === null || num === undefined) return "N/A";
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + "T";
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+            return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+
+        let lastOutput = "";
+
+        async function loadSymbols() {
+            let text = "";
+            try {
+                // Intenta leer activos1.txt (si existe en servidores web / Live Server)
+                const txtRes = await fetch('activos1.txt?t=' + Date.now());
+                if (txtRes.ok) {
+                    text = await txtRes.text();
+                }
+            } catch (err) {
+                // Si se abre con doble clic (file://), el navegador bloquea fetch por CORS
+            }
+
+            // Fallback a SYMBOLS_LIST si fetch no está disponible
+            if (!text && typeof SYMBOLS_LIST !== "undefined") {
+                text = SYMBOLS_LIST;
+            }
+
+            if (!text) {
+                throw new Error("No se pudo cargar la lista de símbolos (activos1.js).");
+            }
+            
+            // Extraer líneas, ignorar vacías y comentarios (# o //)
+            const symList = text.split(/\r?\n/)
+                .map(s => s.trim())
+                .filter(s => s.length > 0 && !s.startsWith('#') && !s.startsWith('//'));
+
+            return symList.map(item => {
+                const isContract = item.startsWith('0x') || item.startsWith('0X');
+                const keyUpper = item.toUpperCase();
+                const keyLower = item.toLowerCase();
+
+                // 1. Revisar si está en CONTRACTS_MAP
+                if (typeof CONTRACTS_MAP !== 'undefined' && CONTRACTS_MAP[keyLower]) {
+                    return CONTRACTS_MAP[keyLower];
+                }
+
+                // 2. Revisar si está en SYMBOL_TO_COIN
+                if (typeof SYMBOL_TO_COIN !== 'undefined') {
+                    if (SYMBOL_TO_COIN[keyUpper]) return SYMBOL_TO_COIN[keyUpper];
+                    if (SYMBOL_TO_COIN[keyLower]) return SYMBOL_TO_COIN[keyLower];
+                }
+
+                // 3. Fallback genérico
+                return {
+                    id: keyLower,
+                    symbol: isContract ? item.slice(0, 6) + '...' + item.slice(-4) : keyUpper,
+                    name: isContract ? 'Token (' + item.slice(0, 6) + '...)' : keyUpper
+                };
+            });
+        }
+
+        async function fetchWatchlist() {
+            try {
+                const coins = await loadSymbols();
+                const ids = coins.map(c => c.id).join(',');
+                // Usar endpoint 'markets' para obtener supply, vol y porcentajes extra con la API Key
+                const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&price_change_percentage=1h,24h,7d&x_cg_demo_api_key=${COINGECKO_API_KEY}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'x-cg-demo-api-key': COINGECKO_API_KEY
+                    }
+                });
+                
+                if (!res.ok) {
+                    if (res.status === 429) {
+                        throw new Error("Límite de peticiones de CoinGecko alcanzado (Rate Limit 429). Espera un minuto.");
+                    }
+                    if (res.status === 403) {
+                        throw new Error("Acceso denegado (403 Forbidden). Verifica la API key de CoinGecko.");
+                    }
+                    throw new Error(`Error en API CoinGecko: HTTP ${res.status}`);
+                }
+
+                const data = await res.json();
+
+                let output = "";
+
+                // Construir Cabeceras
+                output += "Moneda".padEnd(28);
+                output += "Precio".padStart(12) + "  ";
+                output += "1h".padStart(8) + "  ";
+                output += "24h".padStart(8) + "  ";
+                output += "7d".padStart(8) + "  ";
+                output += "MarketCap".padStart(10) + "  ";
+                output += "Vol(24h)".padStart(10) + "  ";
+                output += "Vol/MCap".padStart(10) + "  ";
+                output += "Circ. Supply".padStart(15) + "\n";
+
+
+                // Ordenar por Market Cap descending
+                const capMap = new Map(data.map(c => [c.id, c.market_cap || 0]));
+                const sortedCoins = [...coins].sort((a, b) => (capMap.get(b.id) || 0) - (capMap.get(a.id) || 0));
+
+                sortedCoins.forEach(coinReq => {
+                    const coin = data.find(c => c.id === coinReq.id);
+                    if (coin) {
+                        // Formatear precio (2 decimales para altos, 4 para bajos)
+                        let priceStr = "$" + coin.current_price.toLocaleString('en-US', {
+                            minimumFractionDigits: coin.current_price < 1 ? 4 : 2,
+                            maximumFractionDigits: coin.current_price < 1 ? 4 : 2
+                        });
+
+                        // Función helper para porcentajes con color
+                        const formatPct = (val, pad) => {
+                            if (val === null || val === undefined) return "N/A".padStart(pad);
+                            const valStr = (val > 0 ? "+" : "") + val.toFixed(2) + "%";
+                            const colorClass = val > 0 ? "pos" : (val < 0 ? "neg" : "");
+                            const padded = valStr.padStart(pad);
+                            if (!colorClass) return padded;
+                            return padded.replace(valStr, `<span class="${colorClass}">${valStr}</span>`);
+                        };
+
+                        let ch1Str = formatPct(coin.price_change_percentage_1h_in_currency, 8);
+                        let ch24Str = formatPct(coin.price_change_percentage_24h_in_currency, 8);
+                        let ch7Str = formatPct(coin.price_change_percentage_7d_in_currency, 8);
+
+                        let mcapStr = "$" + formatLargeNum(coin.market_cap);
+                        let volStr = "$" + formatLargeNum(coin.total_volume);
+                        let volMcStr = "N/A";
+                        if (coin.market_cap && coin.total_volume) {
+                            let ratio = (coin.total_volume / coin.market_cap) * 100;
+                            volMcStr = ratio.toFixed(2) + "%";
+                        }
+                        let supplyStr = formatLargeNum(coin.circulating_supply) + " " + coinReq.symbol;
+
+                        // Construir fila alineada
+                        const nameSym = `${coinReq.name} (${coinReq.symbol})`;
+                        output += nameSym.padEnd(28);
+                        output += priceStr.padStart(12) + "  ";
+                        output += ch1Str + "  ";
+                        output += ch24Str + "  ";
+                        output += ch7Str + "  ";
+                        output += mcapStr.padStart(10) + "  ";
+                        output += volStr.padStart(10) + "  ";
+                        output += volMcStr.padStart(10) + "  ";
+                        output += supplyStr.padStart(15) + "\n";
+                    } else {
+                        output += `${coinReq.name} (${coinReq.symbol}) - Datos no disponibles\n`;
+                    }
+                });
+
+                lastOutput = output;
+
+                renderContent();
+
+            } catch (e) {
+                lastOutput = "Error al cargar los datos:\n" + e.message;
+                renderContent();
+                console.error(e);
+            }
+        }
+        let timeLeft = 1800; // 30 minutos en segundos
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function renderContent() {
+            if (lastOutput) {
+                if (lastOutput.startsWith("Error")) {
+                    document.getElementById('monitor').innerHTML = lastOutput;
+                } else {
+                    document.getElementById('monitor').innerHTML = lastOutput.trimEnd() + `\n\nRefresco en: ${formatTime(timeLeft)}`;
+                }
+            }
+        }
+
+        // Carga inicial
+        fetchWatchlist();
+
+        // Actualizar el contador y refrescar al llegar a 0
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                location.reload();
+            } else {
+                renderContent();
+            }
+        }, 1000);
+    </script>
+</body>
+
+</html>
